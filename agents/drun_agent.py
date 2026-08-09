@@ -1,4 +1,4 @@
-"""Benchmark-facing agent: pairs a drun-mcp sandbox session with a local Ollama LLM."""
+"""Agent backed by drun."""
 from __future__ import annotations
 
 from typing import Any
@@ -6,18 +6,13 @@ from typing import Any
 from drun.chat import ChatAgent
 from drun.mcp_bridge import DrunMcpBridge
 
+from .base import Agent
+
 DEFAULT_MCP_URL = "http://127.0.0.1:7273/mcp"
 DEFAULT_MODEL = "ollama_chat/qwen3.6:latest"
 
 
-class Agent:
-    """Runs prompts through a ChatAgent backed by a drun-mcp session.
-
-    Usage:
-        async with Agent() as agent:
-            answer = await agent.ask("...")
-    """
-
+class DrunAgent(Agent):
     def __init__(
         self,
         *,
@@ -30,7 +25,7 @@ class Agent:
         self._chat_kwargs = chat_kwargs
         self._chat_agent: ChatAgent | None = None
 
-    async def __aenter__(self) -> "Agent":
+    async def __aenter__(self) -> "DrunAgent":
         await self._bridge.__aenter__()
         self._chat_agent = ChatAgent(
             self._bridge, model=self._model, **self._chat_kwargs)
@@ -42,5 +37,5 @@ class Agent:
     async def ask(self, prompt: str) -> str:
         if self._chat_agent is None:
             raise RuntimeError(
-                "Agent must be entered with 'async with' before use")
+                "DrunAgent must be entered with 'async with' before use")
         return await self._chat_agent.run(prompt)
