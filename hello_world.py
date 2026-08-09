@@ -22,17 +22,19 @@ QUESTIONS = [
     "Write a file named hello.txt containing 'hello world', then read it back to confirm.",
 ]
 
-HARNESSES: list[type[Agent]] = [
-    DrunAgent,
-    ClaudeCodeAgent,
-    # CodexAgent,
-    OpenInterpreterAgent,
+HARNESSES: list[Agent] = [
+    DrunAgent(name="drun open model", model="ollama_chat/qwen3.6:latest"),
+    OpenInterpreterAgent(name="open model", model="ollama/qwen3.6:latest"),
+    # DrunAgent(name="drun claude", model="claude-sonnet-5"),
+    # ClaudeCodeAgent(name="claude"),
+    # DrunAgent(name="drun chatgpt", model="gpt-4o"),
+    # CodexAgent(name="chatgpt"),
 ]
 
 
-async def run_harness(harness: type[Agent], log: MetricsLog) -> None:
-    print(f"\n=== {harness.__name__} ===")
-    async with harness() as agent:
+async def run_harness(agent: Agent, log: MetricsLog) -> None:
+    async with agent:
+        print(f"\n=== {agent.name} ===")
         for question in QUESTIONS:
             print(f"\nQ: {question}")
             answer = await agent.ask(question)
@@ -43,8 +45,8 @@ async def run_harness(harness: type[Agent], log: MetricsLog) -> None:
 
 async def main() -> None:
     log = MetricsLog()
-    for harness in HARNESSES:
-        await run_harness(harness, log)
+    for agent in HARNESSES:
+        await run_harness(agent, log)
 
     print("\n=== summary ===")
     for harness, stats in log.summary().items():

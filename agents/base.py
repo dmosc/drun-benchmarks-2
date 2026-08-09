@@ -9,15 +9,11 @@ from .metrics import Metrics
 
 
 class Agent(ABC):
-    """Async context-managed agent: enter once, ask any number of prompts, exit.
+    """Async context-managed agent: enter once, ask any number of prompts, exit."""
 
-    `ask` times each call and appends a `Metrics` entry to `self.metrics`, so
-    every harness is measured the same way. Subclasses implement `_ask`
-    instead, returning the answer plus whatever extra fields they can cheaply
-    observe (turns, tool_calls, tokens, cost) — omitted keys stay None.
-    """
-
-    def __init__(self) -> None:
+    def __init__(self, *, name: str | None = None, model: str | None = None) -> None:
+        self.name = name or type(self).__name__
+        self.model = model
         self.metrics: list[Metrics] = []
 
     async def __aenter__(self) -> "Agent":
@@ -30,7 +26,7 @@ class Agent(ABC):
         start = time.monotonic()
         answer, extra = await self._ask(prompt)
         self.metrics.append(Metrics(
-            harness=type(self).__name__,
+            harness=self.name,
             prompt=prompt,
             latency_s=time.monotonic() - start,
             answer_chars=len(answer),

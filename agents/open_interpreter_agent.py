@@ -13,9 +13,8 @@ DEFAULT_MODEL = "ollama/qwen3.6:latest"
 
 
 class OpenInterpreterAgent(Agent):
-    def __init__(self, *, model: str = DEFAULT_MODEL) -> None:
-        super().__init__()
-        self._model = model
+    def __init__(self, *, name: str | None = None, model: str | None = None) -> None:
+        super().__init__(name=name, model=model or DEFAULT_MODEL)
         self._tmp: tempfile.TemporaryDirectory[str] | None = None
 
     async def __aenter__(self) -> "OpenInterpreterAgent":
@@ -40,7 +39,7 @@ class OpenInterpreterAgent(Agent):
 
         interpreter.offline = True
         interpreter.auto_run = True
-        interpreter.llm.model = self._model
+        interpreter.llm.model = self.model
         previous_cwd = os.getcwd()
         os.chdir(workdir)
         try:

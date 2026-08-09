@@ -17,9 +17,8 @@ DEFAULT_MODEL = "gpt-4o"
 
 
 class CodexAgent(Agent):
-    def __init__(self, *, model: str = DEFAULT_MODEL) -> None:
-        super().__init__()
-        self._model = model
+    def __init__(self, *, name: str | None = None, model: str | None = None) -> None:
+        super().__init__(name=name, model=model or DEFAULT_MODEL)
         self._tmp: tempfile.TemporaryDirectory[str] | None = None
 
     async def __aenter__(self) -> "CodexAgent":
@@ -35,7 +34,7 @@ class CodexAgent(Agent):
             raise RuntimeError(
                 "CodexAgent must be entered with 'async with' before use")
         cmd = ["codex", "-q", "--full-auto", "--writable-root", self._tmp.name,
-               "--model", self._model, prompt]
+               "--model", self.model, prompt]
         proc = await asyncio.create_subprocess_exec(
             *cmd, cwd=self._tmp.name,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,

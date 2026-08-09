@@ -35,13 +35,13 @@ class DrunAgent(Agent):
     def __init__(
         self,
         *,
+        name: str | None = None,
+        model: str | None = None,
         mcp_url: str = DEFAULT_MCP_URL,
-        model: str = DEFAULT_MODEL,
         **chat_kwargs: Any,
     ) -> None:
-        super().__init__()
+        super().__init__(name=name, model=model or DEFAULT_MODEL)
         self._bridge = DrunMcpBridge(mcp_url)
-        self._model = model
         self._chat_kwargs = chat_kwargs
         self._counting_bridge: _CountingBridge | None = None
         self._chat_agent: ChatAgent | None = None
@@ -50,7 +50,7 @@ class DrunAgent(Agent):
         await self._bridge.__aenter__()
         self._counting_bridge = _CountingBridge(self._bridge)
         self._chat_agent = ChatAgent(
-            self._counting_bridge, model=self._model, **self._chat_kwargs)
+            self._counting_bridge, model=self.model, **self._chat_kwargs)
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:

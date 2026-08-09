@@ -16,9 +16,8 @@ from .base import Agent
 
 
 class ClaudeCodeAgent(Agent):
-    def __init__(self, *, model: str | None = None) -> None:
-        super().__init__()
-        self._model = model
+    def __init__(self, *, name: str | None = None, model: str | None = None) -> None:
+        super().__init__(name=name, model=model)
         self._tmp: tempfile.TemporaryDirectory[str] | None = None
 
     async def __aenter__(self) -> "ClaudeCodeAgent":
@@ -35,8 +34,8 @@ class ClaudeCodeAgent(Agent):
                 "ClaudeCodeAgent must be entered with 'async with' before use")
         cmd = ["claude", "-p", prompt, "--output-format",
                "json", "--dangerously-skip-permissions"]
-        if self._model:
-            cmd += ["--model", self._model]
+        if self.model:
+            cmd += ["--model", self.model]
         proc = await asyncio.create_subprocess_exec(
             *cmd, cwd=self._tmp.name,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
