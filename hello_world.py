@@ -5,7 +5,14 @@ import asyncio
 
 from dotenv import load_dotenv
 
-from agents import Agent, ClaudeCodeAgent, CodexAgent, DrunAgent, OpenInterpreterAgent
+from agents import (
+    Agent,
+    ClaudeCodeAgent,
+    CodexAgent,
+    DrunAgent,
+    MetricsLog,
+    OpenInterpreterAgent,
+)
 
 load_dotenv(override=True)
 
@@ -23,18 +30,25 @@ HARNESSES: list[type[Agent]] = [
 ]
 
 
-async def run_harness(harness: type[Agent]) -> None:
+async def run_harness(harness: type[Agent], log: MetricsLog) -> None:
     print(f"\n=== {harness.__name__} ===")
     async with harness() as agent:
         for question in QUESTIONS:
             print(f"\nQ: {question}")
             answer = await agent.ask(question)
             print(f"A: {answer}")
+            print(f"  ({agent.metrics[-1]})")
+    log.extend(agent.metrics)
 
 
 async def main() -> None:
+    log = MetricsLog()
     for harness in HARNESSES:
-        await run_harness(harness)
+        await run_harness(harness, log)
+
+    print("\n=== summary ===")
+    for harness, stats in log.summary().items():
+        print(f"{harness}: {stats}")
 
 
 if __name__ == "__main__":

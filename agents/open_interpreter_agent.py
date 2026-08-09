@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
+from typing import Any
 
 from .base import Agent
 
@@ -12,6 +13,7 @@ DEFAULT_MODEL = "ollama/qwen3.6:latest"
 
 class OpenInterpreterAgent(Agent):
     def __init__(self, *, model: str = DEFAULT_MODEL) -> None:
+        super().__init__()
         self._model = model
         self._tmp: tempfile.TemporaryDirectory[str] | None = None
 
@@ -24,13 +26,13 @@ class OpenInterpreterAgent(Agent):
         if self._tmp is not None:
             self._tmp.cleanup()
 
-    async def ask(self, prompt: str) -> str:
+    async def _ask(self, prompt: str) -> tuple[str, dict[str, Any]]:
         if self._tmp is None:
             raise RuntimeError(
                 "OpenInterpreterAgent must be entered with 'async with' before use")
         return await asyncio.to_thread(self._chat, prompt, self._tmp.name)
 
-    def _chat(self, prompt: str, workdir: str) -> str:
+    def _chat(self, prompt: str, workdir: str) -> tuple[str, dict[str, Any]]:
         from interpreter import interpreter  # heavy import; deferred until used
 
         interpreter.offline = True
@@ -42,7 +44,14 @@ class OpenInterpreterAgent(Agent):
             messages = interpreter.chat(prompt, display=False)
         finally:
             os.chdir(previous_cwd)
-        for message in reversed(messages):
-            if message.get("role") == "assistant" and message.get("content"):
-                return message["content"]
-        return ""
+
+        answer = next(
+            (m["content"] for m in reversed(messages)
+             if m.get("role") == "assistant" and m.get("content")),
+            "",
+        )
+        extra = {
+            "turns": sum(1 for m in messages if m.get("role") == "assistant"),
+            "tool_calls": sum(1 for m in messages if m.get("type") == "code"),
+        }
+        return answer, extra

@@ -1,8 +1,15 @@
-"""Agent backed by the Codex CLI."""
+"""Agent backed by the Codex CLI.
+
+Runs in --full-auto mode (edits and commands auto-approved) with the writable
+root pinned to a fresh scratch directory, mirroring ClaudeCodeAgent's isolation.
+Quiet mode only prints the final answer, so no turns/tokens/tool_calls are
+observable here — those fields stay None.
+"""
 from __future__ import annotations
 
 import asyncio
 import tempfile
+from typing import Any
 
 from .base import Agent
 
@@ -11,6 +18,7 @@ DEFAULT_MODEL = "gpt-4o"
 
 class CodexAgent(Agent):
     def __init__(self, *, model: str = DEFAULT_MODEL) -> None:
+        super().__init__()
         self._model = model
         self._tmp: tempfile.TemporaryDirectory[str] | None = None
 
@@ -22,7 +30,7 @@ class CodexAgent(Agent):
         if self._tmp is not None:
             self._tmp.cleanup()
 
-    async def ask(self, prompt: str) -> str:
+    async def _ask(self, prompt: str) -> tuple[str, dict[str, Any]]:
         if self._tmp is None:
             raise RuntimeError(
                 "CodexAgent must be entered with 'async with' before use")
@@ -36,4 +44,4 @@ class CodexAgent(Agent):
         if proc.returncode != 0:
             raise RuntimeError(
                 f"codex exited {proc.returncode}: {stderr.decode().strip()}")
-        return stdout.decode().strip()
+        return stdout.decode().strip(), {}
