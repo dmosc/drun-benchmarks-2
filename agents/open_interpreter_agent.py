@@ -5,6 +5,7 @@ import asyncio
 import os
 import tempfile
 from typing import Any
+from interpreter import interpreter
 
 from .base import Agent
 
@@ -23,6 +24,8 @@ class OpenInterpreterAgent(Agent):
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
+        # Kill all Jupyter notebook runtimes.
+        interpreter.computer.terminal.terminate()
         if self._tmp is not None:
             self._tmp.cleanup()
 
