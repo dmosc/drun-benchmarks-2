@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 import tempfile
 from typing import Any
 from interpreter import interpreter
@@ -42,10 +43,13 @@ class OpenInterpreterAgent(Agent):
         interpreter.llm.model = self.model
         previous_cwd = os.getcwd()
         os.chdir(workdir)
+        messages_before = len(interpreter.messages)
         try:
-            messages = interpreter.chat(prompt, display=False)
+            self._print_progress(interpreter.chat(
+                prompt, display=False, stream=True))
         finally:
             os.chdir(previous_cwd)
+        messages = interpreter.messages[messages_before:]
 
         answer = next(
             (m["content"] for m in reversed(messages)
@@ -57,3 +61,21 @@ class OpenInterpreterAgent(Agent):
             "tool_calls": sum(1 for m in messages if m.get("type") == "code"),
         }
         return answer, extra
+
+    @staticmethod
+    def _print_progress(chunks: Any) -> None:
+        """Streams each step (model text, generated code, execution output) to
+        stderr as it happens, instead of staying silent until the final reply
+        — otherwise a slow local model looks hung with no visible progress."""
+        active_type = None
+        for chunk in chunks:
+            chunk_type = chunk.get("type")
+            if chunk_type != active_type:
+                label = f"{chunk_type}:{chunk['format']}" if chunk.get(
+                    "format") else chunk_type
+                print(f"\n[{label}] ", end="", file=sys.stderr)
+                active_type = chunk_type
+            content = chunk.get("content")
+            if content:
+                print(content, end="", file=sys.stderr, flush=True)
+        print(file=sys.stderr)
