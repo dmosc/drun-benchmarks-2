@@ -7,7 +7,7 @@ from typing import Iterable
 
 _NUMERIC_FIELDS = (
     "latency_s", "answer_chars", "turns", "tool_calls",
-    "input_tokens", "output_tokens", "cost_usd",
+    "input_tokens", "output_tokens", "cost_usd", "continuations",
 )
 
 
@@ -24,6 +24,7 @@ class Metrics:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cost_usd: float | None = None
+    continuations: int | None = None
 
     def __str__(self) -> str:
         values = ((name, getattr(self, name)) for name in _NUMERIC_FIELDS)
@@ -53,7 +54,8 @@ class MetricsLog:
     def _averages(records: list[Metrics]) -> dict[str, float]:
         averages: dict[str, float] = {"calls": len(records)}
         for name in _NUMERIC_FIELDS:
-            values = [v for r in records if (v := getattr(r, name)) is not None]
+            values = [v for r in records if (
+                v := getattr(r, name)) is not None]
             if values:
                 averages[f"avg_{name}"] = round(mean(values), 3)
         return averages

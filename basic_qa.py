@@ -1,4 +1,4 @@
-"""Hello-world benchmark: runs a fixed Q/A set through every harness and prints replies."""
+"""Basic Q/A benchmark: runs a fixed Q/A set through every harness and prints replies."""
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +20,7 @@ QUESTIONS = [
     "What is 7 * 6?",
     "What operating system is this sandbox running on? Check with a shell command.",
     "Write a file named hello.txt containing 'hello world', then read it back to confirm.",
+    "Download the contents of https://arxiv.org/pdf/1803.07199 and list me out all the Fibonacci algorithms documented in there."
 ]
 
 HARNESSES: list[Agent] = [
