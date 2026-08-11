@@ -8,6 +8,7 @@ import tempfile
 from typing import Any
 from interpreter import interpreter
 
+from . import token_meter
 from .base import Agent
 
 DEFAULT_MODEL = "ollama/qwen3.6:latest"
@@ -17,10 +18,12 @@ class OpenInterpreterAgent(Agent):
     def __init__(self, *, name: str | None = None, model: str | None = None) -> None:
         super().__init__(name=name, model=model or DEFAULT_MODEL)
         self._tmp: tempfile.TemporaryDirectory[str] | None = None
+        self._token_meter: Any | None = None
 
     async def __aenter__(self) -> "OpenInterpreterAgent":
         self._tmp = tempfile.TemporaryDirectory(
             prefix="open-interpreter-bench-")
+        self._token_meter = token_meter.install()
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
@@ -38,18 +41,24 @@ class OpenInterpreterAgent(Agent):
     def _chat(self, prompt: str, workdir: str) -> tuple[str, dict[str, Any]]:
         from interpreter import interpreter  # heavy import; deferred until used
 
+        if self._token_meter is None:
+            raise RuntimeError(
+                "OpenInterpreterAgent must be entered with 'async with' before use")
+
         interpreter.offline = True
         interpreter.auto_run = True
         interpreter.llm.model = self.model
         previous_cwd = os.getcwd()
         os.chdir(workdir)
         messages_before = len(interpreter.messages)
+        tokens_before = self._token_meter.mark()
         try:
             self._print_progress(interpreter.chat(
                 prompt, display=False, stream=True))
         finally:
             os.chdir(previous_cwd)
         messages = interpreter.messages[messages_before:]
+        input_tokens, output_tokens = self._token_meter.delta(tokens_before)
 
         answer = next(
             (m["content"] for m in reversed(messages)
@@ -59,6 +68,8 @@ class OpenInterpreterAgent(Agent):
         extra = {
             "turns": sum(1 for m in messages if m.get("role") == "assistant"),
             "tool_calls": sum(1 for m in messages if m.get("type") == "code"),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
         }
         return answer, extra
 

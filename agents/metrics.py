@@ -7,7 +7,7 @@ from typing import Iterable
 
 _NUMERIC_FIELDS = (
     "latency_s", "answer_chars", "turns", "tool_calls",
-    "input_tokens", "output_tokens", "cost_usd", "continuations",
+    "input_tokens", "output_tokens", "cost_usd",
 )
 
 
@@ -24,7 +24,6 @@ class Metrics:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cost_usd: float | None = None
-    continuations: int | None = None
 
     def __str__(self) -> str:
         values = ((name, getattr(self, name)) for name in _NUMERIC_FIELDS)

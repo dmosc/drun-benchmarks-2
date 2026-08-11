@@ -1,3 +1,4 @@
-drun-sandbox[chat]==0.5.16
+drun-sandbox[chat]==0.5.20
 open-interpreter
 python-dotenv
+matplotlib
