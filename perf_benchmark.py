@@ -115,34 +115,81 @@ def summarize(samples: list[Sample]) -> dict[tuple[str, int], dict[str, float]]:
 
     summary: dict[tuple[str, int], dict[str, float]] = {}
     for key, group in grouped.items():
-        tokens = [
-            s.input_tokens + s.output_tokens for s in group
-            if s.input_tokens is not None and s.output_tokens is not None
-        ]
-        stats = {
-            "avg_latency_s": round(statistics.mean(s.latency_s for s in group), 3),
+        latencies = [s.latency_s for s in group]
+        input_tokens = [
+            s.input_tokens for s in group if s.input_tokens is not None]
+        output_tokens = [
+            s.output_tokens for s in group if s.output_tokens is not None]
+        tool_calls = [s.tool_calls for s in group if s.tool_calls is not None]
+
+        avg_latency = statistics.mean(latencies)
+        stats: dict[str, float] = {
+            "avg_latency_s": round(avg_latency, 3),
             "recall": round(statistics.mean(s.correct for s in group), 3),
         }
-        if tokens:
-            stats["avg_tokens"] = round(statistics.mean(tokens), 1)
+        if len(latencies) > 1:
+            # Coefficient of variation: how consistent latency is at this size,
+            # independent of its absolute scale, so it's comparable across sizes.
+            stats["latency_cv"] = round(
+                statistics.stdev(latencies) / avg_latency, 3)
+        if input_tokens and output_tokens:
+            avg_input, avg_output = statistics.mean(
+                input_tokens), statistics.mean(output_tokens)
+            avg_tokens = avg_input + avg_output
+            stats["avg_tokens"] = round(avg_tokens, 1)
+            stats["output_token_ratio"] = round(avg_output / avg_tokens, 3)
+            stats["tokens_per_second"] = round(avg_tokens / avg_latency, 1)
+        if tool_calls:
+            stats["avg_tool_calls"] = round(statistics.mean(tool_calls), 2)
+        if "avg_tokens" in stats and stats.get("avg_tool_calls"):
+            stats["avg_tokens_per_call"] = round(
+                stats["avg_tokens"] / stats["avg_tool_calls"], 1)
         summary[key] = stats
+
+    _add_growth_rates(summary)
     return summary
 
 
-def plot_curves(summary: dict[tuple[str, int], dict[str, float]], path: str) -> None:
+def _add_growth_rates(summary: dict[tuple[str, int], dict[str, float]]) -> None:
+    """Marginal tokens per additional file between consecutive sizes, per
+    harness — whether cost grows *faster* with size, not just how big it is."""
+    harnesses = sorted({harness for harness, _ in summary})
+    for harness in harnesses:
+        sizes = sorted(size for h, size in summary if h == harness)
+        for prev, curr in zip(sizes, sizes[1:]):
+            prev_tokens = summary[(harness, prev)].get("avg_tokens")
+            curr_tokens = summary[(harness, curr)].get("avg_tokens")
+            if prev_tokens is None or curr_tokens is None:
+                continue
+            summary[(harness, curr)]["token_growth_rate"] = round(
+                (curr_tokens - prev_tokens) / (curr - prev), 2)
+
+
+_PANELS = [
+    ("avg_latency_s", "Latency (s)"),
+    ("avg_tokens", "Tokens (input + output)"),
+    ("recall", "Recall (fraction correct)"),
+    ("avg_tool_calls", "Tool calls"),
+    ("avg_tokens_per_call", "Tokens per tool call"),
+    ("token_growth_rate", "Marginal tokens / additional file"),
+    ("tokens_per_second", "Tokens / second"),
+    ("output_token_ratio", "Output token share"),
+    ("latency_cv", "Latency variability (stdev / mean)"),
+]
+
+
+def plot_metrics(summary: dict[tuple[str, int], dict[str, float]], path: str, ncols: int = 3) -> None:
+    import math
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     harnesses = sorted({harness for harness, _ in summary})
-    panels = [
-        ("avg_latency_s", "Latency (s)"),
-        ("avg_tokens", "Tokens (input + output)"),
-        ("recall", "Recall (fraction correct)"),
-    ]
+    nrows = math.ceil(len(_PANELS) / ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4.5 * nrows))
+    axes = axes.flatten()
 
-    fig, axes = plt.subplots(1, len(panels), figsize=(6 * len(panels), 4.5))
-    for ax, (field, label) in zip(axes, panels):
+    for ax, (field, label) in zip(axes, _PANELS):
         for harness in harnesses:
             sizes = sorted(size for h, size in summary if h == harness)
             values = [summary[(harness, size)].get(field) for size in sizes]
@@ -155,6 +202,8 @@ def plot_curves(summary: dict[tuple[str, int], dict[str, float]], path: str) -> 
         ax.set_ylabel(label)
         ax.set_title(label)
         ax.legend()
+    for ax in axes[len(_PANELS):]:
+        ax.axis("off")
 
     fig.tight_layout()
     fig.savefig(path, dpi=150)
@@ -172,7 +221,7 @@ async def main() -> None:
     for (harness, size), stats in sorted(summary.items(), key=lambda kv: (kv[0][0], kv[0][1])):
         print(f"{harness} @ size={size}: {stats}")
 
-    plot_curves(summary, "perf_curves.png")
+    plot_metrics(summary, "perf_curves.png")
     print("\nWrote curves to perf_curves.png")
 
 
